@@ -633,7 +633,7 @@ fn hitbox_sequence_system(
                     hitbox_set.active_sequence = None;
                 }
                 HitboxSequenceEvent::TagTriggered { name } => {
-                    tag_triggers.push((name, hitbox_set.owner.clone()));
+                    tag_triggers.push((name, id));
                 }
             }
         }
