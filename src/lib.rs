@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use emerald::{Emerald, Entity, World};
+use emerald::{toml::Value, Emerald, Entity, World};
 use hitboxes::{hitbox_system, HitboxSequenceEvent};
 
 pub mod component_loader;
@@ -10,6 +10,7 @@ pub mod hurtboxes;
 pub struct OnTagTriggerContext {
     pub tag: String,
     pub hitbox_set_owner: Entity,
+    pub data: Value,
 }
 
 pub type OnTagTriggerFn = fn(emd: &mut Emerald, world: &mut World, ctx: OnTagTriggerContext);
@@ -26,7 +27,8 @@ pub struct HitmeConfig {
     /// Ex. An entity is affected by a time slow effect, and progresses slower than usual.
     pub alt_get_delta_for_entity_fn: Option<GetDeltaForEntityFn>,
 
-    tag_handlers: HashMap<String, OnTagTriggerFn>,
+    tag_handlers_by_name: HashMap<String, OnTagTriggerFn>,
+    tag_handlers: Vec<OnTagTriggerFn>,
 }
 impl HitmeConfig {
     pub fn get_delta(&self, emd: &mut Emerald, world: &World) -> f32 {
@@ -46,7 +48,8 @@ impl Default for HitmeConfig {
         Self {
             alt_get_delta_fn: Default::default(),
             alt_get_delta_for_entity_fn: Default::default(),
-            tag_handlers: HashMap::new(),
+            tag_handlers: Vec::new(),
+            tag_handlers_by_name: HashMap::new(),
         }
     }
 }
@@ -55,10 +58,19 @@ pub fn init(emd: &mut Emerald, config: HitmeConfig) {
     emd.resources().insert(config);
 }
 
-pub fn add_on_tag_trigger<T: Into<String>>(emd: &mut Emerald, tag: T, handler: OnTagTriggerFn) {
+pub fn add_on_tag_trigger_by_name<T: Into<String>>(
+    emd: &mut Emerald,
+    tag: T,
+    handler: OnTagTriggerFn,
+) {
     emd.resources()
         .get_mut::<HitmeConfig>()
-        .map(|config| config.tag_handlers.insert(tag.into(), handler));
+        .map(|config| config.tag_handlers_by_name.insert(tag.into(), handler));
+}
+pub fn add_on_tag_trigger(emd: &mut Emerald, handler: OnTagTriggerFn) {
+    emd.resources()
+        .get_mut::<HitmeConfig>()
+        .map(|config| config.tag_handlers.push(handler));
 }
 pub fn emd_hitme_system(emd: &mut Emerald, world: &mut World) {
     let config = emd.resources().remove::<HitmeConfig>().unwrap();

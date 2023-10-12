@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::hurtboxes::RectCollider;
 use crate::{HitmeConfig, OnTagTriggerContext};
 use emerald::serde::Deserialize;
+use emerald::toml::Value;
 use emerald::{
     toml::value::Map, ColliderHandle, EmeraldError, Entity, RigidBodyBuilder, Transform, Vector2,
     World,
@@ -135,6 +136,10 @@ impl HitboxSet {
     }
 }
 
+fn default_tag_data() -> Value {
+    Value::Table(emerald::toml::map::Map::new())
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(crate = "emerald::serde")]
 pub struct HitboxSequenceFrameTag {
@@ -146,7 +151,10 @@ pub struct HitboxSequenceFrameTag {
 
     /// How long after the frame started, to emit the tag
     #[serde(default)]
-    pub trigger_delay: f32,
+    pub delay: f32,
+
+    #[serde(default = "default_tag_data")]
+    pub data: emerald::toml::Value,
 }
 
 #[derive(Debug, Deserialize)]
@@ -200,7 +208,7 @@ impl HitboxSequenceFrame {
 pub enum HitboxSequenceEvent {
     HitboxDeactivated { hitbox: Entity },
     HitboxActivated { hitbox: Entity },
-    TagTriggered { name: String },
+    TagTriggered { name: String, data: Value },
     Finished,
 }
 impl HitboxSequenceEvent {
@@ -311,10 +319,11 @@ impl ActiveSequenceData {
         if let Some(frames) = sequences.get_mut(&self.name) {
             if let Some(frame) = frames.get_mut(self.frame) {
                 frame.tags.iter_mut().for_each(|tag| {
-                    if self.elapsed_time >= tag.trigger_delay && !tag.triggered {
+                    if self.elapsed_time >= tag.delay && !tag.triggered {
                         tag.triggered = true;
                         events.push(HitboxSequenceEvent::TagTriggered {
                             name: tag.name.clone(),
+                            data: tag.data.clone(),
                         });
                     }
                 });
@@ -632,24 +641,31 @@ fn hitbox_sequence_system(
                 HitboxSequenceEvent::Finished => {
                     hitbox_set.active_sequence = None;
                 }
-                HitboxSequenceEvent::TagTriggered { name } => {
-                    tag_triggers.push((name, id));
+                HitboxSequenceEvent::TagTriggered { name, data } => {
+                    tag_triggers.push((name, id, data));
                 }
             }
         }
     }
 
-    for (tag, hitbox_set_owner) in tag_triggers {
-        config.tag_handlers.get(&tag).map(|f| {
+    for (tag, hitbox_set_owner, data) in tag_triggers {
+        let mut handlers = config.tag_handlers.clone();
+
+        config.tag_handlers_by_name.get(&tag).map(|f| {
+            handlers.push(*f);
+        });
+
+        for f in handlers {
             f(
                 emd,
                 world,
                 OnTagTriggerContext {
-                    tag,
+                    tag: tag.clone(),
                     hitbox_set_owner,
+                    data: data.clone(),
                 },
             )
-        });
+        }
     }
 
     for id in to_activate {
