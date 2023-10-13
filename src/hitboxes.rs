@@ -110,6 +110,7 @@ impl HitboxSet {
 
         let sequence = ActiveSequenceData::new(name);
         self.active_sequence = Some(sequence);
+        self.reset_sequences();
 
         Ok(())
     }
@@ -133,6 +134,19 @@ impl HitboxSet {
         }
 
         None
+    }
+
+    pub fn reset_sequences(&mut self) {
+        self.sequences.iter_mut().for_each(|(_, frames)| {
+            frames.iter_mut().for_each(|f| f.reset());
+        });
+    }
+
+    /// If there is an active sequence, returns if its finjished
+    pub fn is_current_sequence_finished(&self) -> Option<bool> {
+        self.active_sequence
+            .as_ref()
+            .map(|active_sequence| active_sequence.is_finished(&self.sequences))
     }
 }
 
@@ -296,6 +310,20 @@ impl ActiveSequenceData {
         entities
     }
 
+    pub fn is_finished(&self, sequences: &HashMap<String, Vec<HitboxSequenceFrame>>) -> bool {
+        let (last_frame, last_frame_limit) = sequences
+            .get(&self.name)
+            .map(|frames| {
+                (
+                    frames.len() - 1,
+                    frames.last().map(|f| f.limit).unwrap_or(0.0),
+                )
+            })
+            .unwrap_or((0, 0.0));
+
+        self.frame == last_frame && self.elapsed_time >= last_frame_limit
+    }
+
     pub fn progress(
         &mut self,
         sequences: &mut HashMap<String, Vec<HitboxSequenceFrame>>,
@@ -327,12 +355,13 @@ impl ActiveSequenceData {
                         });
                     }
                 });
+
                 if self.elapsed_time >= frame.limit + delay {
                     self.deactivate_current_hitboxes(sequences, hitboxes, &mut events);
 
                     self.elapsed_time = 0.0;
-                    self.frame += 1;
                     self.reset_current_frame(sequences);
+                    self.frame += 1;
 
                     if let Some(count) = get_sequence_frame_count(sequences, &self.name) {
                         if self.frame >= count {
