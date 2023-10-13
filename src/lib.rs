@@ -1,11 +1,14 @@
 use std::collections::HashMap;
 
-use emerald::{toml::Value, Emerald, Entity, World};
-use hitboxes::{hitbox_system, HitboxSequenceEvent};
+use emerald::{toml::Value, Emerald, EmeraldError, Entity, World};
+use hitboxes::{hitbox_system, Hitbox, HitboxSet};
+use hurtboxes::{Hurtbox, HurtboxSet};
+use tracker::{tracker_system, SimpleTranslationTracker};
 
 pub mod component_loader;
 pub mod hitboxes;
 pub mod hurtboxes;
+pub(crate) mod tracker;
 
 pub struct OnTagTriggerContext {
     pub tag: String,
@@ -56,6 +59,7 @@ impl Default for HitmeConfig {
 
 pub fn init(emd: &mut Emerald, config: HitmeConfig) {
     emd.resources().insert(config);
+    emd.loader().add_world_merge_handler(merge_handler);
 }
 
 pub fn add_on_tag_trigger_by_name<T: Into<String>>(
@@ -75,5 +79,56 @@ pub fn add_on_tag_trigger(emd: &mut Emerald, handler: OnTagTriggerFn) {
 pub fn emd_hitme_system(emd: &mut Emerald, world: &mut World) {
     let config = emd.resources().remove::<HitmeConfig>().unwrap();
     hitbox_system(emd, world, &config).unwrap();
+    tracker_system(emd, world, &config);
     emd.resources().insert(config);
+}
+
+fn merge_handler(
+    new_world: &mut World,
+    _old_world: &mut World,
+    entity_map: &mut HashMap<Entity, Entity>,
+) -> Result<(), EmeraldError> {
+    println!("merging");
+    new_world
+        .query::<&mut Hitbox>()
+        .iter()
+        .for_each(|(_, hitbox)| {
+            entity_map
+                .get(&hitbox.parent_set)
+                .map(|e| hitbox.parent_set = e.clone());
+        });
+    new_world
+        .query::<&mut Hurtbox>()
+        .iter()
+        .for_each(|(_, hurtbox)| {
+            entity_map
+                .get(&hurtbox.parent_set)
+                .map(|e| hurtbox.parent_set = e.clone());
+        });
+    new_world
+        .query::<&mut HurtboxSet>()
+        .iter()
+        .for_each(|(_, hurtbox_set)| {
+            entity_map
+                .get(&hurtbox_set.owner)
+                .map(|e| hurtbox_set.owner = e.clone());
+        });
+    new_world
+        .query::<&mut HitboxSet>()
+        .iter()
+        .for_each(|(_, hitbox_set)| {
+            entity_map.get(&hitbox_set.owner).map(|e| {
+                hitbox_set.owner = e.clone();
+                println!("updated");
+            });
+        });
+    new_world
+        .query::<&mut SimpleTranslationTracker>()
+        .iter()
+        .for_each(|(_, tracker)| {
+            entity_map
+                .get(&tracker.target)
+                .map(|e| tracker.target = e.clone());
+        });
+    Ok(())
 }

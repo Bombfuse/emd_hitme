@@ -5,6 +5,8 @@ use emerald::{
     Translation, Vector2, World,
 };
 
+use crate::tracker::SimpleTranslationTracker;
+
 struct HurtboxParent(pub Entity);
 
 fn hitbox_system(world: &mut World) {
@@ -36,7 +38,15 @@ impl HurtboxSet {
             .map(|hurtbox| {
                 let colliders = hurtbox.colliders.clone();
                 let (id, rbh) = world.spawn_with_body(
-                    (hurtbox, Transform::default(), HurtboxParent(owner)),
+                    (
+                        hurtbox,
+                        Transform::default(),
+                        HurtboxParent(owner),
+                        SimpleTranslationTracker {
+                            target: owner,
+                            offset: Translation::new(0.0, 0.0),
+                        },
+                    ),
                     RigidBodyBuilder::dynamic(),
                 )?;
 

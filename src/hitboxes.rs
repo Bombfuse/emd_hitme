@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::hurtboxes::RectCollider;
+use crate::tracker::SimpleTranslationTracker;
 use crate::{HitmeConfig, OnTagTriggerContext};
 use emerald::serde::Deserialize;
 use emerald::toml::Value;
@@ -8,7 +9,7 @@ use emerald::{
     toml::value::Map, ColliderHandle, EmeraldError, Entity, RigidBodyBuilder, Transform, Vector2,
     World,
 };
-use emerald::{Emerald, Group, InteractionGroups};
+use emerald::{Emerald, Group, InteractionGroups, Translation};
 
 struct HitboxParent(pub Entity);
 
@@ -37,7 +38,6 @@ impl HitboxSet {
             .unwrap_or(&default)
             .as_table()
             .unwrap_or(&default_map);
-
         let owner_transform = world.get::<&mut Transform>(owner)?.clone();
         let hitboxes = hitboxes_table
             .into_iter()
@@ -45,7 +45,15 @@ impl HitboxSet {
                 let hitbox = Hitbox::from_toml(world, value, owner)?;
                 let colliders = hitbox.raw_collider_data.clone();
                 let (id, rbh) = world.spawn_with_body(
-                    (hitbox, owner_transform.clone(), HitboxParent(owner)),
+                    (
+                        hitbox,
+                        owner_transform.clone(),
+                        HitboxParent(owner),
+                        SimpleTranslationTracker {
+                            target: owner,
+                            offset: Translation::new(0.0, 0.0),
+                        },
+                    ),
                     RigidBodyBuilder::dynamic(),
                 )?;
                 for collider in colliders {
