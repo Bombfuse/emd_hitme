@@ -9,10 +9,6 @@ use crate::tracker::SimpleTranslationTracker;
 
 struct HurtboxParent(pub Entity);
 
-fn hitbox_system(world: &mut World) {
-    // TODO: sync positions of all hurtboxes to their parents position
-}
-
 pub struct HurtboxSet {
     pub hurtboxes: Vec<Entity>,
     /// The entity that owns this hurtbox, and will receive damage from it

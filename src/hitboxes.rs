@@ -184,7 +184,7 @@ pub struct HitboxSequenceFrameTag {
 pub struct HitboxSequenceFrame {
     /// Time limit for the frame, before it moves onto the next frame
     #[serde(default)]
-    pub limit: f32,
+    pub duration: f32,
 
     /// Name of the collider to activate
     pub name: Option<String>,
@@ -199,10 +199,14 @@ pub struct HitboxSequenceFrame {
     /// Tags bound this frame, often used as "triggers" for other effects
     #[serde(default)]
     tags: Vec<HitboxSequenceFrameTag>,
+
+    #[serde(default)]
+    active: bool,
 }
 impl HitboxSequenceFrame {
     pub fn reset(&mut self) {
         self.tags.iter_mut().for_each(|tag| tag.triggered = false);
+        self.active = false;
     }
 
     pub fn get_hitboxes(&self, hitboxes: &HashMap<String, Entity>) -> Vec<Entity> {
@@ -324,12 +328,22 @@ impl ActiveSequenceData {
             .map(|frames| {
                 (
                     frames.len() - 1,
-                    frames.last().map(|f| f.limit).unwrap_or(0.0),
+                    frames.last().map(|f| f.duration).unwrap_or(0.0),
                 )
             })
             .unwrap_or((0, 0.0));
 
         self.frame == last_frame && self.elapsed_time >= last_frame_limit
+    }
+
+    pub fn is_current_frame_active(
+        &self,
+        sequences: &mut HashMap<String, Vec<HitboxSequenceFrame>>,
+    ) -> bool {
+        sequences
+            .get(&self.name)
+            .map(|frames| frames.get(self.frame).map(|f| f.active).unwrap_or(false))
+            .unwrap_or(false)
     }
 
     pub fn progress(
@@ -348,14 +362,14 @@ impl ActiveSequenceData {
         self.elapsed_time += delta;
 
         // First frame, activate hitboxes
-        if self.frame == 0 && self.elapsed_time >= delay {
-            self.activate_current_hitboxes(sequences, hitboxes, &mut events);
+        if self.elapsed_time >= delay && !self.is_current_frame_active(sequences) {
+            self.activate_current_frame(sequences, hitboxes, &mut events);
         }
 
         if let Some(frames) = sequences.get_mut(&self.name) {
             if let Some(frame) = frames.get_mut(self.frame) {
                 frame.tags.iter_mut().for_each(|tag| {
-                    if self.elapsed_time >= tag.delay && !tag.triggered {
+                    if self.elapsed_time >= tag.delay + delay && !tag.triggered {
                         tag.triggered = true;
                         events.push(HitboxSequenceEvent::TagTriggered {
                             name: tag.name.clone(),
@@ -364,20 +378,18 @@ impl ActiveSequenceData {
                     }
                 });
 
-                if self.elapsed_time >= frame.limit + delay {
-                    self.deactivate_current_hitboxes(sequences, hitboxes, &mut events);
+                if self.elapsed_time >= frame.duration + delay {
+                    self.deactivate_current_frame(sequences, hitboxes, &mut events);
 
                     self.elapsed_time = 0.0;
                     self.reset_current_frame(sequences);
                     self.frame += 1;
 
-                    if let Some(count) = get_sequence_frame_count(sequences, &self.name) {
+                    get_sequence_frame_count(sequences, &self.name).map(|count| {
                         if self.frame >= count {
                             events.push(HitboxSequenceEvent::Finished);
-                        } else {
-                            self.activate_current_hitboxes(sequences, hitboxes, &mut events);
                         }
-                    }
+                    });
                 }
             }
         }
@@ -391,22 +403,26 @@ impl ActiveSequenceData {
             .map(|frames| frames.get_mut(self.frame).map(|f| f.reset()));
     }
 
-    pub fn activate_current_hitboxes(
+    pub fn activate_current_frame(
         &self,
-        sequences: &HashMap<String, Vec<HitboxSequenceFrame>>,
+        sequences: &mut HashMap<String, Vec<HitboxSequenceFrame>>,
         hitboxes: &HashMap<String, Entity>,
         events: &mut Vec<HitboxSequenceEvent>,
     ) {
+        println!("active at elapsed {:?}", self.elapsed_time);
         events.extend(
             self.get_current_active_hitboxes(sequences, hitboxes)
                 .into_iter()
                 .map(|e| HitboxSequenceEvent::HitboxActivated { hitbox: e })
                 .collect::<Vec<HitboxSequenceEvent>>(),
         );
+        sequences
+            .get_mut(&self.name)
+            .map(|frames| frames.get_mut(self.frame).map(|f| f.active = true));
     }
-    pub fn deactivate_current_hitboxes(
+    pub fn deactivate_current_frame(
         &self,
-        sequences: &HashMap<String, Vec<HitboxSequenceFrame>>,
+        sequences: &mut HashMap<String, Vec<HitboxSequenceFrame>>,
         hitboxes: &HashMap<String, Entity>,
         events: &mut Vec<HitboxSequenceEvent>,
     ) {
@@ -416,6 +432,9 @@ impl ActiveSequenceData {
                 .map(|e| HitboxSequenceEvent::HitboxDeactivated { hitbox: e })
                 .collect::<Vec<HitboxSequenceEvent>>(),
         );
+        sequences
+            .get_mut(&self.name)
+            .map(|frames| frames.get_mut(self.frame).map(|f| f.active = false));
     }
 }
 
@@ -535,6 +554,10 @@ impl Hitbox {
     }
 
     pub fn activate(&mut self) {
+        if self.active {
+            return;
+        }
+        println!("activate hitbox");
         self.active = true;
     }
 
@@ -553,6 +576,10 @@ impl Hitbox {
         } else {
             true
         }
+    }
+
+    pub fn add_damaged_entity(&mut self, entity: Entity) {
+        self.add_damaged_entities([entity].to_vec());
     }
 
     pub fn add_damaged_entities(&mut self, entities: Vec<Entity>) {
@@ -589,7 +616,7 @@ pub fn get_all_active_hitboxes(world: &World) -> Vec<Entity> {
     world
         .query::<&Hitbox>()
         .iter()
-        .filter_map(|(id, hitbox)| if hitbox.active { Some(id) } else { None })
+        .filter_map(|(id, hitbox)| hitbox.active.then(|| id))
         .collect()
 }
 
@@ -599,8 +626,6 @@ pub fn hitbox_system(
     world: &mut World,
     config: &HitmeConfig,
 ) -> Result<(), EmeraldError> {
-    // TODO: sync position of all hitboxes to parent position
-
     hitbox_one_time_system(emd, world, config)?;
     hitbox_damaged_entity_delta_system(emd, world, config);
     hitbox_sequence_system(emd, world, config)?;
@@ -623,11 +648,11 @@ fn hitbox_one_time_system(
     world: &mut World,
     config: &HitmeConfig,
 ) -> Result<(), EmeraldError> {
-    for (id, hitbox) in world.query::<&mut Hitbox>().iter() {
-        if !hitbox.is_one_time() {
-            continue;
-        }
-
+    for (id, hitbox) in world
+        .query::<&mut Hitbox>()
+        .iter()
+        .filter(|(_, h)| h.is_one_time())
+    {
         hitbox.elapsed_time += config.get_delta_for_entity(emd, world, id);
 
         if let Some(trigger) = &hitbox.activate_after {
@@ -706,14 +731,16 @@ fn hitbox_sequence_system(
     }
 
     for id in to_activate {
-        let mut hitbox = world.get::<&mut Hitbox>(id).unwrap();
-        hitbox.activate();
+        world.get::<&mut Hitbox>(id).ok().map(|mut hitbox| {
+            hitbox.activate();
+        });
     }
 
     for id in to_deactivate {
-        let mut hitbox = world.get::<&mut Hitbox>(id).unwrap();
-        hitbox.deactivate();
-        hitbox.refresh();
+        world.get::<&mut Hitbox>(id).ok().map(|mut hitbox| {
+            hitbox.deactivate();
+            hitbox.refresh();
+        });
     }
 
     Ok(())
@@ -745,11 +772,12 @@ mod sequence_tests {
         let mut sequences = HashMap::new();
         let mut hitboxes = HashMap::new();
         let sequence_frames = vec![HitboxSequenceFrame {
-            limit: 2.0,
+            duration: 2.0,
             name: Some(hitbox_name.clone()),
             names: None,
             delay: 0.0,
             tags: Vec::new(),
+            active: false,
         }];
 
         let hitbox_entity = world.spawn((Transform::default(),));
