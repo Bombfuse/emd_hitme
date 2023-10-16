@@ -189,32 +189,29 @@ pub fn get_all_active_hurtboxes(world: &World) -> Vec<Entity> {
     world
         .query::<&Hurtbox>()
         .iter()
-        .filter_map(|(id, hurtbox)| if hurtbox.active { Some(id) } else { None })
+        .filter_map(|(id, hurtbox)| hurtbox.active.then(|| id))
         .collect()
 }
 
 /// returns all entities that have hurtboxes from the given set
-fn get_active_hurtboxes(world: &World, entities: Vec<Entity>) -> Vec<Entity> {
+fn get_active_hurtboxes_on_entities(world: &World, entities: Vec<Entity>) -> Vec<Entity> {
     entities
         .into_iter()
         .filter_map(|id| {
-            if let Ok(hurtbox) = world.get::<&Hurtbox>(id) {
-                if hurtbox.active {
-                    return Some(id);
-                }
-            }
-
-            None
+            world
+                .get::<&Hurtbox>(id)
+                .ok()
+                .map(|h| h.active)
+                .unwrap_or(false)
+                .then(|| id)
         })
         .collect()
 }
 
 fn get_colliding_active_hurtbox_sets(world: &mut World, id: Entity) -> Vec<Entity> {
-    let hurtboxes = get_colliding_active_hurtboxes(world, id);
-
     let mut hurtbox_sets = HashSet::new();
 
-    for id in hurtboxes {
+    for id in get_colliding_active_hurtboxes(world, id) {
         if let Ok(hurtbox) = world.get::<&Hurtbox>(id) {
             hurtbox_sets.insert(hurtbox.parent_set);
         }
@@ -225,7 +222,7 @@ fn get_colliding_active_hurtbox_sets(world: &mut World, id: Entity) -> Vec<Entit
 
 pub fn get_colliding_active_hurtboxes(world: &mut World, id: Entity) -> Vec<Entity> {
     let colliding_entities = world.physics().get_colliding_entities(id);
-    get_active_hurtboxes(world, colliding_entities)
+    get_active_hurtboxes_on_entities(world, colliding_entities)
 }
 
 pub fn get_hurtbox_parent_set(world: &World, id: Entity) -> Option<Entity> {

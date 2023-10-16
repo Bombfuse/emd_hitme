@@ -28,8 +28,8 @@ impl HitboxSet {
         world: &mut World,
         value: &emerald::toml::Value,
         owner: Entity,
-        hitbox_group: Group,
         hurtbox_group: Group,
+        hitbox_group: Group,
     ) -> Result<Self, EmeraldError> {
         let default = emerald::toml::Value::Table(Map::new());
         let default_map = Map::new();
@@ -409,7 +409,6 @@ impl ActiveSequenceData {
         hitboxes: &HashMap<String, Entity>,
         events: &mut Vec<HitboxSequenceEvent>,
     ) {
-        println!("active at elapsed {:?}", self.elapsed_time);
         events.extend(
             self.get_current_active_hitboxes(sequences, hitboxes)
                 .into_iter()
@@ -557,7 +556,6 @@ impl Hitbox {
         if self.active {
             return;
         }
-        println!("activate hitbox");
         self.active = true;
     }
 

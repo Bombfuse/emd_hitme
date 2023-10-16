@@ -116,40 +116,58 @@ pub fn add_on_tag_trigger(emd: &mut Emerald, handler: OnTagTriggerFn) {
 pub fn emd_hitme_system(emd: &mut Emerald, world: &mut World) {
     let config = emd.resources().remove::<HitmeConfig>().unwrap();
     hitbox_system(emd, world, &config).unwrap();
-    get_active_hitbox_to_active_hurtbox_collisions(world)
-        .into_iter()
-        .for_each(|(hitbox_id, hurtboxes)| {
-            hurtboxes.into_iter().for_each(|hurtbox| {
-                config.on_hit_fns.iter().for_each(|f| {
-                    get_hurtbox_owner(world, hurtbox).map(|hurtbox_owner| {
-                        get_hitbox_owner(world, hitbox_id).map(|hitbox_owner| {
-                            let can_damage_hurtbox_owner = world
-                                .get::<&Hitbox>(hitbox_owner)
-                                .ok()
-                                .map(|h| h.can_damage_entity(&hurtbox_owner))
-                                .unwrap_or(false);
+    let collisions = get_active_hitbox_to_active_hurtbox_collisions(world);
+    collisions.into_iter().for_each(|(hitbox_id, hurtboxes)| {
+        hurtboxes.into_iter().for_each(|hurtbox| {
+            config.on_hit_fns.iter().for_each(|f| {
+                get_hurtbox_owner(world, hurtbox).map(|hurtbox_owner| {
+                    get_hitbox_owner(world, hitbox_id).map(|hitbox_owner| {
+                        let can_damage_hurtbox_owner = world
+                            .get::<&Hitbox>(hitbox_id)
+                            .ok()
+                            .map(|h| h.can_damage_entity(&hurtbox_owner))
+                            .unwrap_or(false);
 
-                            if can_damage_hurtbox_owner {
-                                f(
-                                    emd,
-                                    world,
-                                    OnHitContext {
-                                        hit_entity: hitbox_owner,
-                                        hurt_entity: hurtbox_owner,
-                                        hurtbox,
-                                        hitbox: hitbox_id,
-                                    },
-                                );
-                            }
+                        let hit = config.hit_filter_fns.iter().any(|filter_fn| {
+                            !filter_fn(
+                                emd,
+                                world,
+                                OnHitFilterContext {
+                                    hit_entity: hitbox_owner,
+                                    hurt_entity: hurtbox_owner,
+                                    hurtbox: hurtbox,
+                                    hitbox: hitbox_id,
+                                },
+                            )
                         });
+                        if hit && can_damage_hurtbox_owner {
+                            f(
+                                emd,
+                                world,
+                                OnHitContext {
+                                    hit_entity: hitbox_owner,
+                                    hurt_entity: hurtbox_owner,
+                                    hurtbox,
+                                    hitbox: hitbox_id,
+                                },
+                            );
+                            add_to_damaged_list(world, hitbox_id, hurtbox_owner);
+                        }
                     });
                 });
             });
         });
+    });
 
     tracker_system(emd, world, &config);
 
     emd.resources().insert(config);
+}
+
+pub fn add_to_damaged_list(world: &mut World, hitbox_id: Entity, damaged_entity: Entity) {
+    world.get::<&mut Hitbox>(hitbox_id).ok().map(|mut h| {
+        h.add_damaged_entity(damaged_entity);
+    });
 }
 
 fn merge_handler(
@@ -178,11 +196,13 @@ fn merge_handler(
         .iter()
         .for_each(|(_, hurtbox_set)| {
             let old_hurtbox_ids = hurtbox_set.hurtboxes.clone();
-            hurtbox_set.hurtboxes = Vec::new();
             old_hurtbox_ids.into_iter().for_each(|h| {
-                entity_map
-                    .get(&h)
-                    .map(|e| hurtbox_set.hurtboxes.push(e.clone()));
+                entity_map.get(&h).map(|e| {
+                    hurtbox_set
+                        .hurtboxes
+                        .contains(&e)
+                        .then(|| hurtbox_set.hurtboxes.push(e.clone()))
+                });
             });
             entity_map
                 .get(&hurtbox_set.owner)
@@ -245,9 +265,9 @@ pub fn get_active_hitbox_to_active_hurtbox_collisions(
                     .get::<&Hitbox>(hitbox_id)
                     .unwrap()
                     .can_damage_entity(&hurtbox_set_owner);
-                let not_same_owner = hitbox_set_owner != hurtbox_set_owner;
+                let same_owner = hitbox_set_owner == hurtbox_set_owner;
 
-                not_same_owner && can_damage_hurtbox_owner
+                !same_owner && can_damage_hurtbox_owner
             })
             .collect::<HashSet<Entity>>();
 
