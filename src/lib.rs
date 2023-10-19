@@ -128,7 +128,7 @@ pub fn emd_hitme_system(emd: &mut Emerald, world: &mut World) {
                             .map(|h| h.can_damage_entity(&hurtbox_owner))
                             .unwrap_or(false);
 
-                        let hit = config.hit_filter_fns.iter().any(|filter_fn| {
+                        let hit = !config.hit_filter_fns.iter().any(|filter_fn| {
                             !filter_fn(
                                 emd,
                                 world,
@@ -140,6 +140,7 @@ pub fn emd_hitme_system(emd: &mut Emerald, world: &mut World) {
                                 },
                             )
                         });
+
                         if hit && can_damage_hurtbox_owner {
                             f(
                                 emd,
