@@ -11,8 +11,6 @@ use emerald::{
 };
 use emerald::{Emerald, Group, InteractionGroups, Translation};
 
-struct HitboxParent(pub Entity);
-
 /// A series of hitboxes that act as one.
 /// If the set is disabled, it's children will not be considered for combat.
 #[derive(Debug)]
@@ -48,7 +46,6 @@ impl HitboxSet {
                     (
                         hitbox,
                         owner_transform.clone(),
-                        HitboxParent(owner),
                         SimpleTranslationTracker {
                             target: owner,
                             offset: Translation::new(0.0, 0.0),

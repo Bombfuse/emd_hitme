@@ -176,61 +176,67 @@ fn merge_handler(
     _old_world: &mut World,
     entity_map: &mut HashMap<Entity, Entity>,
 ) -> Result<(), EmeraldError> {
-    new_world
-        .query::<&mut Hitbox>()
-        .iter()
-        .for_each(|(_, hitbox)| {
-            entity_map
-                .get(&hitbox.parent_set)
-                .map(|e| hitbox.parent_set = e.clone());
-        });
-    new_world
-        .query::<&mut Hurtbox>()
-        .iter()
-        .for_each(|(_, hurtbox)| {
-            entity_map
-                .get(&hurtbox.parent_set)
-                .map(|e| hurtbox.parent_set = e.clone());
-        });
-    new_world
-        .query::<&mut HurtboxSet>()
-        .iter()
-        .for_each(|(_, hurtbox_set)| {
-            let old_hurtbox_ids = hurtbox_set.hurtboxes.clone();
-            old_hurtbox_ids.into_iter().for_each(|h| {
-                entity_map.get(&h).map(|e| {
-                    hurtbox_set
-                        .hurtboxes
-                        .contains(&e)
-                        .then(|| hurtbox_set.hurtboxes.push(e.clone()))
+    for (old_entity, new_entity) in entity_map.iter() {
+        new_world
+            .get::<&mut SimpleTranslationTracker>(new_entity.clone())
+            .ok()
+            .map(|mut s| {
+                entity_map.get(&s.target).map(|e| {
+                    s.target = e.clone();
                 });
             });
-            entity_map
-                .get(&hurtbox_set.owner)
-                .map(|e| hurtbox_set.owner = e.clone());
-        });
-    new_world
-        .query::<&mut HitboxSet>()
-        .iter()
-        .for_each(|(_, hitbox_set)| {
-            let old_hitbox_ids = hitbox_set.hitboxes.clone();
-            old_hitbox_ids.into_iter().for_each(|(name, h)| {
-                entity_map.get(&h).map(|e| {
-                    hitbox_set.hitboxes.insert(name, e.clone());
+
+        new_world
+            .get::<&mut Hitbox>(new_entity.clone())
+            .ok()
+            .map(|mut h| {
+                entity_map
+                    .get(&h.parent_set)
+                    .map(|e| h.parent_set = e.clone())
+            });
+        new_world
+            .get::<&mut Hurtbox>(new_entity.clone())
+            .ok()
+            .map(|mut h| {
+                entity_map
+                    .get(&h.parent_set)
+                    .map(|e| h.parent_set = e.clone())
+            });
+        new_world
+            .get::<&mut HurtboxSet>(new_entity.clone())
+            .ok()
+            .map(|mut hurtbox_set| {
+                let old_hurtbox_ids = hurtbox_set.hurtboxes.clone();
+                hurtbox_set.hurtboxes = Vec::new();
+                old_hurtbox_ids.into_iter().for_each(|h| {
+                    entity_map.get(&h).map(|e| {
+                        hurtbox_set
+                            .hurtboxes
+                            .contains(&e)
+                            .then(|| hurtbox_set.hurtboxes.push(e.clone()))
+                    });
+                });
+                entity_map
+                    .get(&hurtbox_set.owner)
+                    .map(|e| hurtbox_set.owner = e.clone());
+            });
+        new_world
+            .get::<&mut HitboxSet>(new_entity.clone())
+            .ok()
+            .map(|mut hitbox_set| {
+                let old_hitbox_ids = hitbox_set.hitboxes.clone();
+                hitbox_set.hitboxes = HashMap::new();
+                old_hitbox_ids.into_iter().for_each(|(name, h)| {
+                    entity_map.get(&h).map(|e| {
+                        hitbox_set.hitboxes.insert(name, e.clone());
+                    });
+                });
+                entity_map.get(&hitbox_set.owner).map(|e| {
+                    hitbox_set.owner = e.clone();
                 });
             });
-            entity_map.get(&hitbox_set.owner).map(|e| {
-                hitbox_set.owner = e.clone();
-            });
-        });
-    new_world
-        .query::<&mut SimpleTranslationTracker>()
-        .iter()
-        .for_each(|(_, tracker)| {
-            entity_map
-                .get(&tracker.target)
-                .map(|e| tracker.target = e.clone());
-        });
+    }
+
     Ok(())
 }
 

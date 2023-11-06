@@ -7,8 +7,6 @@ use emerald::{
 
 use crate::tracker::SimpleTranslationTracker;
 
-struct HurtboxParent(pub Entity);
-
 pub struct HurtboxSet {
     pub hurtboxes: Vec<Entity>,
     /// The entity that owns this hurtbox, and will receive damage from it
@@ -22,6 +20,7 @@ impl HurtboxSet {
         hurtbox_group: Group,
         hitbox_group: Group,
     ) -> Result<Self, EmeraldError> {
+        let owner_transform = world.get::<&mut Transform>(owner)?.clone();
         let hurtboxes = value
             .get("hurtboxes")
             .unwrap_or(&emerald::toml::Value::Array(Vec::new()))
@@ -36,8 +35,7 @@ impl HurtboxSet {
                 let (id, rbh) = world.spawn_with_body(
                     (
                         hurtbox,
-                        Transform::default(),
-                        HurtboxParent(owner),
+                        owner_transform.clone(),
                         SimpleTranslationTracker {
                             target: owner,
                             offset: Translation::new(0.0, 0.0),

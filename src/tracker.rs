@@ -29,6 +29,7 @@ pub(crate) fn tracker_system(emd: &mut Emerald, world: &mut World, config: &Hitm
                 .deref()
                 .clone();
 
+            println!("{:?}", target_transform);
             *transform = target_transform + Transform::from_translation(tracker.offset);
         });
 
