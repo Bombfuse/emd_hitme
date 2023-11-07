@@ -115,6 +115,7 @@ pub fn add_on_tag_trigger(emd: &mut Emerald, handler: OnTagTriggerFn) {
 }
 pub fn emd_hitme_system(emd: &mut Emerald, world: &mut World) {
     let config = emd.resources().remove::<HitmeConfig>().unwrap();
+    cleanup_system(world, &config);
     hitbox_system(emd, world, &config).unwrap();
     let collisions = get_active_hitbox_to_active_hurtbox_collisions(world);
     collisions.into_iter().for_each(|(hitbox_id, hurtboxes)| {
@@ -168,6 +169,24 @@ pub fn emd_hitme_system(emd: &mut Emerald, world: &mut World) {
 pub fn add_to_damaged_list(world: &mut World, hitbox_id: Entity, damaged_entity: Entity) {
     world.get::<&mut Hitbox>(hitbox_id).ok().map(|mut h| {
         h.add_damaged_entity(damaged_entity);
+    });
+}
+
+fn cleanup_system(world: &mut World, config: &HitmeConfig) {
+    let mut to_despawn = Vec::new();
+    for (id, h) in world.query::<&Hitbox>().iter() {
+        if !world.contains(h.parent_set) {
+            to_despawn.push(id);
+        }
+    }
+    for (id, h) in world.query::<&Hurtbox>().iter() {
+        if !world.contains(h.parent_set) {
+            to_despawn.push(id);
+        }
+    }
+
+    to_despawn.into_iter().for_each(|id| {
+        world.despawn(id).ok();
     });
 }
 
