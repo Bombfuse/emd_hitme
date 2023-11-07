@@ -241,6 +241,7 @@ fn merge_handler(
             .ok()
             .map(|mut hitbox_set| {
                 let old_hitbox_ids = hitbox_set.hitboxes.clone();
+                hitbox_set.hitboxes = HashMap::new();
                 old_hitbox_ids.into_iter().for_each(|(name, h)| {
                     entity_map.get(&h).map(|e| {
                         hitbox_set.hitboxes.insert(name, e.clone());
