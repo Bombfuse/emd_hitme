@@ -516,7 +516,7 @@ impl Hitbox {
             .map(|f| f as f32);
 
         // default to 1 second
-        let mut cooldown_per_entity = Some(1.0);
+        let mut cooldown_per_entity = None;
 
         if let Some(cd) = value.get("cooldown_per_entity") {
             if let Some(n) = cd.as_float() {
@@ -550,9 +550,6 @@ impl Hitbox {
     }
 
     pub fn activate(&mut self) {
-        if self.active {
-            return;
-        }
         self.active = true;
     }
 

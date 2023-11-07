@@ -220,7 +220,8 @@ fn get_colliding_active_hurtbox_sets(world: &mut World, id: Entity) -> Vec<Entit
 
 pub fn get_colliding_active_hurtboxes(world: &mut World, id: Entity) -> Vec<Entity> {
     let colliding_entities = world.physics().get_colliding_entities(id);
-    get_active_hurtboxes_on_entities(world, colliding_entities)
+    let colliding_active_hurtboxes = get_active_hurtboxes_on_entities(world, colliding_entities);
+    colliding_active_hurtboxes
 }
 
 pub fn get_hurtbox_parent_set(world: &World, id: Entity) -> Option<Entity> {

@@ -210,10 +210,7 @@ fn merge_handler(
                 hurtbox_set.hurtboxes = Vec::new();
                 old_hurtbox_ids.into_iter().for_each(|h| {
                     entity_map.get(&h).map(|e| {
-                        hurtbox_set
-                            .hurtboxes
-                            .contains(&e)
-                            .then(|| hurtbox_set.hurtboxes.push(e.clone()))
+                        hurtbox_set.hurtboxes.push(e.clone());
                     });
                 });
                 entity_map
@@ -225,7 +222,6 @@ fn merge_handler(
             .ok()
             .map(|mut hitbox_set| {
                 let old_hitbox_ids = hitbox_set.hitboxes.clone();
-                hitbox_set.hitboxes = HashMap::new();
                 old_hitbox_ids.into_iter().for_each(|(name, h)| {
                     entity_map.get(&h).map(|e| {
                         hitbox_set.hitboxes.insert(name, e.clone());
