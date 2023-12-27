@@ -482,6 +482,8 @@ pub struct Hitbox {
 
     /// Entities that have been damaged by this hitbox, and how much time has elapsed since they've been hit
     pub damaged_entities: HashMap<Entity, f32>,
+
+    pub visible: bool,
 }
 impl Hitbox {
     pub fn from_toml(
@@ -524,6 +526,12 @@ impl Hitbox {
             }
         }
 
+        let visible = value
+            .get("visible")
+            .unwrap_or(&emerald::toml::Value::Boolean(false))
+            .as_bool()
+            .unwrap_or(false);
+
         Ok(Self {
             parent_set,
             colliders: HashMap::new(),
@@ -534,6 +542,7 @@ impl Hitbox {
             deactivate_after,
             cooldown_per_entity,
             elapsed_time: 0.0,
+            visible,
         })
     }
 
