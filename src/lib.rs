@@ -6,6 +6,7 @@ use hurtboxes::{get_colliding_active_hurtboxes, get_hurtbox_owner, Hurtbox, Hurt
 use tracker::{tracker_system, SimpleTranslationTracker};
 
 pub mod component_loader;
+pub mod draw;
 pub mod hitboxes;
 pub mod hurtboxes;
 pub(crate) mod tracker;

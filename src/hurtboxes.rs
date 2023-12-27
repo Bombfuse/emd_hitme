@@ -90,6 +90,8 @@ pub struct Hurtbox {
     pub active: bool,
     pub parent_set: Entity,
     pub colliders: Vec<RectCollider>,
+    /// Whether or not the hurtbox is visible when debug drawing
+    pub visible: bool,
 }
 impl Hurtbox {
     pub fn from_toml(
@@ -111,10 +113,16 @@ impl Hurtbox {
             .map(|value| RectCollider::from_toml(value))
             .collect::<Result<Vec<RectCollider>, EmeraldError>>()?;
 
+        let visible = value
+            .get("visible")
+            .unwrap_or(&emerald::toml::Value::Boolean(false))
+            .as_bool()
+            .unwrap_or(false);
         Ok(Self {
             active,
             parent_set,
             colliders,
+            visible,
         })
     }
 }
