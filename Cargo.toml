@@ -6,4 +6,4 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-emerald = { path = "../xbox/emerald/emerald" }
+emerald = { path = "../emerald/emerald" }
