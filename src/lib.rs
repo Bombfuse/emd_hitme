@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use emerald::{toml::Value, Emerald, EmeraldError, Entity, World};
+use emerald::{toml::Value, Emerald, EmeraldError, Entity, World, WorldMerge};
 use hitboxes::{get_all_active_hitboxes, get_hitbox_owner, hitbox_system, Hitbox, HitboxSet};
 use hurtboxes::{get_colliding_active_hurtboxes, get_hurtbox_owner, Hurtbox, HurtboxSet};
 use tracker::{tracker_system, SimpleTranslationTracker};
@@ -195,6 +195,7 @@ fn merge_handler(
     new_world: &mut World,
     _old_world: &mut World,
     entity_map: &mut HashMap<Entity, Entity>,
+    ctx: &WorldMerge,
 ) -> Result<(), EmeraldError> {
     for (old_entity, new_entity) in entity_map.iter() {
         new_world

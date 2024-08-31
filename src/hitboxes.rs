@@ -278,6 +278,10 @@ impl ActiveSequenceData {
         }
     }
 
+    pub fn add_delay(&mut self, delay: f32) {
+        self.elapsed_time -= delay;
+    }
+
     pub fn get_current_active_hitboxes(
         &self,
         sequences: &HashMap<String, Vec<HitboxSequenceFrame>>,
